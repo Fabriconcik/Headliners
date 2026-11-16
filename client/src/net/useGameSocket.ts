@@ -242,6 +242,59 @@ export function useGameSocket() {
         return;
       }
 
+      if (msg.type === 'SHIELD_BC') {
+        sfx.playShield();
+        setSnapshot((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            effects: { ...prev.effects, shieldUntil: msg.shieldUntil },
+            players: prev.players.map((p) =>
+              p.id === msg.actorId ? { ...p, shieldCooldownUntil: msg.cooldownUntil } : p,
+            ),
+          };
+        });
+        return;
+      }
+
+      if (msg.type === 'BREAKING_NEWS_BC') {
+        sfx.playBreakingNews();
+        setSnapshot((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            effects: {
+              ...prev.effects,
+              breakingNewsUntil: msg.until,
+              breakingNewsAuthor: msg.authorName,
+            },
+            players: prev.players.map((p) =>
+              p.id === msg.actorId ? { ...p, breakingNewsCooldownUntil: msg.cooldownUntil } : p,
+            ),
+          };
+        });
+        return;
+      }
+
+      if (msg.type === 'TICKER_CLEAN_BC') {
+        sfx.playClean();
+        setSnapshot((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            ticker: prev.ticker.map((m) => {
+              if (m.hackedText) {
+                const copy = { ...m };
+                delete copy.hackedText;
+                return copy;
+              }
+              return m;
+            }),
+          };
+        });
+        return;
+      }
+
       if (msg.type === 'SABOTAGE_VISUAL_BC') {
         sfx.playSplat();
         setSnapshot((prev) => {
@@ -255,13 +308,18 @@ export function useGameSocket() {
       }
 
       if (msg.type === 'SABOTAGE_FX_BC') {
-        sfx.playGlitch();
+        if (msg.fx === 'static') sfx.playStatic();
+        else if (msg.fx === 'shake') sfx.playRumble();
+        else sfx.playGlitch();
+
         setSnapshot((prev) => {
           if (!prev) return prev;
           const nextEffects = { ...prev.effects };
           if (msg.fx === 'glitch') nextEffects.glitchUntil = msg.until;
           if (msg.fx === 'flip') nextEffects.flippedUntil = msg.until;
           if (msg.fx === 'forced_brush') nextEffects.forcedBrushUntil = msg.until;
+          if (msg.fx === 'static') nextEffects.staticNoiseUntil = msg.until;
+          if (msg.fx === 'shake') nextEffects.shakeUntil = msg.until;
           return { ...prev, effects: nextEffects };
         });
         return;

@@ -114,9 +114,16 @@ export function ReplayScreen({ snapshot, playerId, clockOffsetMs, send }: Props)
       playedEventIndicesRef.current.add(i);
       if (ev.type === 'PHASE' && ev.phase === 'SPLASH') sfx.playNewsJingle();
       if (ev.type === 'PHASE' && ev.phase === 'FREEZE') sfx.playShutter();
+      if (ev.type === 'SHIELD') sfx.playShield();
+      if (ev.type === 'BREAKING_NEWS') sfx.playBreakingNews();
+      if (ev.type === 'TICKER_CLEAN') sfx.playClean();
       if (!cleanReplay && ev.type === 'WIPERS') sfx.playWipers();
       if (!cleanReplay && ev.type === 'SABOTAGE_VISUAL') sfx.playSplat();
-      if (!cleanReplay && ev.type === 'SABOTAGE_FX') sfx.playGlitch();
+      if (!cleanReplay && ev.type === 'SABOTAGE_FX') {
+        if (ev.fx === 'static') sfx.playStatic();
+        else if (ev.fx === 'shake') sfx.playRumble();
+        else sfx.playGlitch();
+      }
       if (ev.type === 'REACTION') sfx.playPop();
     }
 
@@ -143,6 +150,19 @@ export function ReplayScreen({ snapshot, playerId, clockOffsetMs, send }: Props)
       if (!cleanReplay && virtT - ev.t <= TIMINGS.WIPERS_ANIM_MS) {
         effects.wipersAnimUntil = Date.now() + (TIMINGS.WIPERS_ANIM_MS - (virtT - ev.t));
       }
+    } else if (ev.type === 'SHIELD') {
+      if (virtT - ev.t <= TIMINGS.SHIELD_DURATION_MS) {
+        effects.shieldUntil = Date.now() + (TIMINGS.SHIELD_DURATION_MS - (virtT - ev.t));
+      }
+    } else if (ev.type === 'BREAKING_NEWS') {
+      if (virtT - ev.t <= TIMINGS.BREAKING_NEWS_DURATION_MS) {
+        effects.breakingNewsUntil = Date.now() + (TIMINGS.BREAKING_NEWS_DURATION_MS - (virtT - ev.t));
+        effects.breakingNewsAuthor = ev.authorName;
+      }
+    } else if (ev.type === 'TICKER_CLEAN') {
+      for (const m of tickerMap.values()) {
+        delete m.hackedText;
+      }
     } else if (ev.type === 'SABOTAGE_VISUAL') {
       if (!cleanReplay) {
         sabotageItems.push(ev.item);
@@ -154,6 +174,12 @@ export function ReplayScreen({ snapshot, playerId, clockOffsetMs, send }: Props)
         }
         if (ev.fx === 'glitch' && virtT - ev.t <= TIMINGS.GLITCH_DURATION_MS) {
           effects.glitchUntil = Date.now() + (TIMINGS.GLITCH_DURATION_MS - (virtT - ev.t));
+        }
+        if (ev.fx === 'static' && virtT - ev.t <= TIMINGS.STATIC_NOISE_DURATION_MS) {
+          effects.staticNoiseUntil = Date.now() + (TIMINGS.STATIC_NOISE_DURATION_MS - (virtT - ev.t));
+        }
+        if (ev.fx === 'shake' && virtT - ev.t <= TIMINGS.SHAKE_DURATION_MS) {
+          effects.shakeUntil = Date.now() + (TIMINGS.SHAKE_DURATION_MS - (virtT - ev.t));
         }
       }
     } else if (ev.type === 'TICKER_ADD') {

@@ -17,6 +17,8 @@ export interface PlayerInfo {
   saboteurClass: SaboteurClass | null;
   energy: number;
   wipersCooldownUntil: number;
+  shieldCooldownUntil?: number;
+  breakingNewsCooldownUntil?: number;
 }
 
 export interface PointNorm {
@@ -48,7 +50,7 @@ export type CanvasDrawItem = DrawStrokeItem | DrawStampItem;
 
 export interface SabotageVisualItem {
   id: string;
-  type: 'tomato' | 'sticker' | 'crack' | 'censor' | 'spotlight';
+  type: 'tomato' | 'sticker' | 'crack' | 'censor' | 'spotlight' | 'ink_splat';
   x: number; // 0..1
   y: number; // 0..1
   scale: number;
@@ -70,6 +72,11 @@ export interface ActiveEffectsState {
   glitchUntil: number;
   forcedBrushUntil: number;
   wipersAnimUntil: number;
+  shieldUntil?: number;
+  breakingNewsUntil?: number;
+  breakingNewsAuthor?: string;
+  staticNoiseUntil?: number;
+  shakeUntil?: number;
 }
 
 export interface SegmentSummary {
@@ -92,8 +99,11 @@ export type ReplayEvent =
   | { t: number; type: 'STAMP_ADD'; item: DrawStampItem }
   | { t: number; type: 'UNDO_ITEM'; itemId: string }
   | { t: number; type: 'WIPERS' }
+  | { t: number; type: 'SHIELD'; actorId?: string }
+  | { t: number; type: 'BREAKING_NEWS'; authorName: string }
+  | { t: number; type: 'TICKER_CLEAN'; actorId?: string }
   | { t: number; type: 'SABOTAGE_VISUAL'; item: SabotageVisualItem }
-  | { t: number; type: 'SABOTAGE_FX'; fx: 'glitch' | 'flip' | 'forced_brush' }
+  | { t: number; type: 'SABOTAGE_FX'; fx: 'glitch' | 'flip' | 'forced_brush' | 'static' | 'shake' }
   | { t: number; type: 'TICKER_ADD'; id: string; authorName: string; text: string }
   | { t: number; type: 'TICKER_HACK'; id: string; hackedText: string }
   | { t: number; type: 'REACTION'; id: string; emoji: string; lane: number };
@@ -153,6 +163,9 @@ export type C2SMessage =
   | { type: 'PLACE_STAMP'; id: string; stampId: string; color: string; x: number; y: number }
   | { type: 'UNDO_LAST' }
   | { type: 'USE_WIPERS' }
+  | { type: 'USE_SHIELD' }
+  | { type: 'USE_BREAKING_NEWS' }
+  | { type: 'CLEAN_TICKER' }
   | { type: 'USE_ABILITY'; abilityId: AbilityId; x?: number; y?: number }
   | { type: 'SEND_REACTION'; emoji: string }
   | { type: 'LEAVE_ROOM' }
@@ -170,8 +183,11 @@ export type S2CMessage =
   | { type: 'STAMP_ADD_BC'; item: DrawStampItem }
   | { type: 'UNDO_BC'; itemId: string }
   | { type: 'WIPERS_BC'; actorId: string; cooldownUntil: number; animUntil: number }
+  | { type: 'SHIELD_BC'; actorId: string; cooldownUntil: number; shieldUntil: number }
+  | { type: 'BREAKING_NEWS_BC'; actorId: string; authorName: string; cooldownUntil: number; until: number }
+  | { type: 'TICKER_CLEAN_BC'; actorId: string }
   | { type: 'SABOTAGE_VISUAL_BC'; item: SabotageVisualItem }
-  | { type: 'SABOTAGE_FX_BC'; fx: 'glitch' | 'flip' | 'forced_brush'; until: number }
+  | { type: 'SABOTAGE_FX_BC'; fx: 'glitch' | 'flip' | 'forced_brush' | 'static' | 'shake'; until: number }
   | { type: 'TICKER_ADD_BC'; message: TickerMessage }
   | { type: 'TICKER_HACK_BC'; id: string; hackedText: string }
   | { type: 'REACTION_BC'; id: string; emoji: string; lane: number; senderId: string };

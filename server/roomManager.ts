@@ -273,6 +273,8 @@ export class RoomManager {
         saboteurClass: p.saboteurClass,
         energy: Math.round(p.energy),
         wipersCooldownUntil: p.wipersCooldownUntil,
+        shieldCooldownUntil: p.shieldCooldownUntil ?? 0,
+        breakingNewsCooldownUntil: p.breakingNewsCooldownUntil ?? 0,
       })),
       slotLimits: computeRoleSlots(this.activePlayers(room).length, room.testMode),
       roleSelectEndsAt: room.roleSelectEndsAt,
@@ -590,6 +592,18 @@ export class RoomManager {
         this.handleUseWipers(room, player);
         break;
 
+      case 'USE_SHIELD':
+        this.handleUseShield(room, player);
+        break;
+
+      case 'USE_BREAKING_NEWS':
+        this.handleUseBreakingNews(room, player);
+        break;
+
+      case 'CLEAN_TICKER':
+        this.handleCleanTicker(room, player);
+        break;
+
       case 'USE_ABILITY':
         this.handleUseAbility(room, player, msg.abilityId, msg.x, msg.y);
         break;
@@ -635,6 +649,8 @@ export class RoomManager {
       saboteurClass: null,
       energy: ENERGY.START,
       wipersCooldownUntil: 0,
+      shieldCooldownUntil: 0,
+      breakingNewsCooldownUntil: 0,
       token,
       ws,
       lastReactionAt: 0,
@@ -655,7 +671,16 @@ export class RoomManager {
       drawItems: [],
       sabotageItems: [],
       ticker: [],
-      effects: { flippedUntil: 0, glitchUntil: 0, forcedBrushUntil: 0, wipersAnimUntil: 0 },
+      effects: {
+        flippedUntil: 0,
+        glitchUntil: 0,
+        forcedBrushUntil: 0,
+        wipersAnimUntil: 0,
+        shieldUntil: 0,
+        breakingNewsUntil: 0,
+        staticNoiseUntil: 0,
+        shakeUntil: 0,
+      },
       replay: null,
       timers: new Set(),
       energyInterval: null,
@@ -738,6 +763,8 @@ export class RoomManager {
       saboteurClass: null,
       energy: ENERGY.START,
       wipersCooldownUntil: 0,
+      shieldCooldownUntil: 0,
+      breakingNewsCooldownUntil: 0,
       token,
       ws,
       lastReactionAt: 0,
@@ -819,6 +846,8 @@ export class RoomManager {
       saboteurClass: null,
       energy: ENERGY.START,
       wipersCooldownUntil: 0,
+      shieldCooldownUntil: 0,
+      breakingNewsCooldownUntil: 0,
       token: randomUUID(),
       ws: null,
       lastReactionAt: 0,
@@ -849,6 +878,8 @@ export class RoomManager {
       p.saboteurClass = null;
       p.energy = ENERGY.START;
       p.wipersCooldownUntil = 0;
+      p.shieldCooldownUntil = 0;
+      p.breakingNewsCooldownUntil = 0;
     }
 
     this.syncAll(room);
@@ -974,7 +1005,16 @@ export class RoomManager {
     room.drawItems = [];
     room.sabotageItems = [];
     room.ticker = [];
-    room.effects = { flippedUntil: 0, glitchUntil: 0, forcedBrushUntil: 0, wipersAnimUntil: 0 };
+    room.effects = {
+      flippedUntil: 0,
+      glitchUntil: 0,
+      forcedBrushUntil: 0,
+      wipersAnimUntil: 0,
+      shieldUntil: 0,
+      breakingNewsUntil: 0,
+      staticNoiseUntil: 0,
+      shakeUntil: 0,
+    };
 
     const now = Date.now();
     const leadPlayer = room.players.find((p) => p.id === lead.id);
@@ -1058,6 +1098,8 @@ export class RoomManager {
         p.energy = Math.max(p.energy, ENERGY.START);
       }
       p.wipersCooldownUntil = 0;
+      p.shieldCooldownUntil = 0;
+      p.breakingNewsCooldownUntil = 0;
     }
 
     this.syncAll(room);
@@ -1110,7 +1152,16 @@ export class RoomManager {
     room.drawItems = [];
     room.sabotageItems = [];
     room.ticker = [];
-    room.effects = { flippedUntil: 0, glitchUntil: 0, forcedBrushUntil: 0, wipersAnimUntil: 0 };
+    room.effects = {
+      flippedUntil: 0,
+      glitchUntil: 0,
+      forcedBrushUntil: 0,
+      wipersAnimUntil: 0,
+      shieldUntil: 0,
+      breakingNewsUntil: 0,
+      staticNoiseUntil: 0,
+      shakeUntil: 0,
+    };
 
     const startedAt = Date.now() + 800; // slight sync buffer for all clients
     const payload = buildReplayPayload(room.recordedSegments, startedAt);
@@ -1134,12 +1185,23 @@ export class RoomManager {
     room.drawItems = [];
     room.sabotageItems = [];
     room.ticker = [];
-    room.effects = { flippedUntil: 0, glitchUntil: 0, forcedBrushUntil: 0, wipersAnimUntil: 0 };
+    room.effects = {
+      flippedUntil: 0,
+      glitchUntil: 0,
+      forcedBrushUntil: 0,
+      wipersAnimUntil: 0,
+      shieldUntil: 0,
+      breakingNewsUntil: 0,
+      staticNoiseUntil: 0,
+      shakeUntil: 0,
+    };
     for (const p of room.players) {
       p.role = null;
       p.saboteurClass = null;
       p.energy = ENERGY.START;
       p.wipersCooldownUntil = 0;
+      p.shieldCooldownUntil = 0;
+      p.breakingNewsCooldownUntil = 0;
     }
     this.syncAll(room);
   }
@@ -1346,6 +1408,66 @@ export class RoomManager {
     });
   }
 
+  private handleUseShield(room: Room, player: InternalPlayer): void {
+    if (room.screen !== 'BROADCAST' || room.segment?.phase !== 'LIVE') return;
+    if (player.role !== 'artist') return;
+
+    const now = Date.now();
+    if (now < (player.shieldCooldownUntil ?? 0)) return;
+
+    player.shieldCooldownUntil = now + TIMINGS.SHIELD_COOLDOWN_MS;
+    room.effects.shieldUntil = now + TIMINGS.SHIELD_DURATION_MS;
+
+    room.segment.events.push({ t: this.segTime(room), type: 'SHIELD', actorId: player.id });
+    this.broadcast(room, {
+      type: 'SHIELD_BC',
+      actorId: player.id,
+      cooldownUntil: player.shieldCooldownUntil,
+      shieldUntil: room.effects.shieldUntil,
+    });
+  }
+
+  private handleUseBreakingNews(room: Room, player: InternalPlayer): void {
+    if (room.screen !== 'BROADCAST' || room.segment?.phase !== 'LIVE') return;
+    if (player.role !== 'writer') return;
+
+    const now = Date.now();
+    if (now < (player.breakingNewsCooldownUntil ?? 0)) return;
+
+    player.breakingNewsCooldownUntil = now + TIMINGS.BREAKING_NEWS_COOLDOWN_MS;
+    room.effects.breakingNewsUntil = now + TIMINGS.BREAKING_NEWS_DURATION_MS;
+    room.effects.breakingNewsAuthor = player.name;
+
+    room.segment.events.push({ t: this.segTime(room), type: 'BREAKING_NEWS', authorName: player.name });
+    this.broadcast(room, {
+      type: 'BREAKING_NEWS_BC',
+      actorId: player.id,
+      authorName: player.name,
+      cooldownUntil: player.breakingNewsCooldownUntil,
+      until: room.effects.breakingNewsUntil,
+    });
+  }
+
+  private handleCleanTicker(room: Room, player: InternalPlayer): void {
+    if (room.screen !== 'BROADCAST' || room.segment?.phase !== 'LIVE') return;
+    if (player.role !== 'writer') return;
+
+    let hasHacked = false;
+    for (const msg of room.ticker) {
+      if (msg.hackedText) {
+        delete msg.hackedText;
+        hasHacked = true;
+      }
+    }
+    if (!hasHacked) return;
+
+    room.segment.events.push({ t: this.segTime(room), type: 'TICKER_CLEAN', actorId: player.id });
+    this.broadcast(room, {
+      type: 'TICKER_CLEAN_BC',
+      actorId: player.id,
+    });
+  }
+
   private handleUseAbility(
     room: Room,
     player: InternalPlayer,
@@ -1382,8 +1504,13 @@ export class RoomManager {
       abilityId === 'sticker' ||
       abilityId === 'crack' ||
       abilityId === 'censor' ||
-      abilityId === 'spotlight'
+      abilityId === 'spotlight' ||
+      abilityId === 'ink_splat'
     ) {
+      // If Artist protective shield is active, deflect the sabotage from hitting canvas!
+      if ((room.effects.shieldUntil ?? 0) > now) {
+        return;
+      }
       const item: SabotageVisualItem = {
         id: randomUUID().slice(0, 8),
         type: abilityId,
@@ -1394,8 +1521,11 @@ export class RoomManager {
             ? 0.9 + Math.random() * 0.35
             : abilityId === 'spotlight'
               ? 1.25 + Math.random() * 0.35
-              : 0.85 + Math.random() * 0.4,
-        rotation: abilityId === 'spotlight' ? 0 : (Math.random() - 0.5) * 0.6,
+              : abilityId === 'ink_splat'
+                ? 1.05 + Math.random() * 0.25
+                : 0.85 + Math.random() * 0.4,
+        rotation:
+          abilityId === 'spotlight' ? 0 : abilityId === 'ink_splat' ? (Math.random() - 0.5) * 1.2 : (Math.random() - 0.5) * 0.6,
         sticker:
           abilityId === 'sticker'
             ? VANDAL_STICKERS[Math.floor(Math.random() * VANDAL_STICKERS.length)]
@@ -1430,6 +1560,20 @@ export class RoomManager {
         fx: 'forced_brush',
         until: room.effects.forcedBrushUntil,
       });
+      return;
+    }
+
+    if (abilityId === 'static_noise') {
+      room.effects.staticNoiseUntil = now + TIMINGS.STATIC_NOISE_DURATION_MS;
+      room.segment.events.push({ t: this.segTime(room), type: 'SABOTAGE_FX', fx: 'static' });
+      this.broadcast(room, { type: 'SABOTAGE_FX_BC', fx: 'static', until: room.effects.staticNoiseUntil });
+      return;
+    }
+
+    if (abilityId === 'camera_shake') {
+      room.effects.shakeUntil = now + TIMINGS.SHAKE_DURATION_MS;
+      room.segment.events.push({ t: this.segTime(room), type: 'SABOTAGE_FX', fx: 'shake' });
+      this.broadcast(room, { type: 'SABOTAGE_FX_BC', fx: 'shake', until: room.effects.shakeUntil });
       return;
     }
 
@@ -1487,14 +1631,24 @@ export class RoomManager {
       if (!bot.isBot) continue;
       const last = room.lastBotActionAt[bot.id] ?? 0;
 
-      if (bot.role === 'writer' && now - last > 8500) {
+      if (bot.role === 'writer' && now - last > 6000) {
         room.lastBotActionAt[bot.id] = now;
-        const line = BOT_TICKER_LINES[Math.floor(Math.random() * BOT_TICKER_LINES.length)];
-        this.handleAddTicker(room, bot, line);
+        if (room.ticker.some((m) => m.hackedText) && Math.random() < 0.6) {
+          this.handleCleanTicker(room, bot);
+        } else {
+          const line = BOT_TICKER_LINES[Math.floor(Math.random() * BOT_TICKER_LINES.length)];
+          this.handleAddTicker(room, bot, line);
+        }
       } else if (bot.role === 'artist' && now - last > 2400) {
         room.lastBotActionAt[bot.id] = now;
         if (room.sabotageItems.length >= 3 && now >= bot.wipersCooldownUntil && Math.random() < 0.6) {
           this.handleUseWipers(room, bot);
+        } else if (
+          room.sabotageItems.length >= 2 &&
+          now >= (bot.shieldCooldownUntil ?? 0) &&
+          Math.random() < 0.5
+        ) {
+          this.handleUseShield(room, bot);
         } else if (Math.random() < 0.45) {
           const stamp = STAMPS[Math.floor(Math.random() * STAMPS.length)];
           const color = ARTIST_COLORS[Math.floor(Math.random() * ARTIST_COLORS.length)];

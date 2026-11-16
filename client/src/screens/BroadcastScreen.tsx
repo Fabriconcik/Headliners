@@ -108,6 +108,23 @@ export function BroadcastScreen({
     setTimeLeft(left);
   }, [segment?.phaseEndsAt, segment?.phase, now]);
 
+  // Saboteur QoL: chime when an ability becomes newly affordable
+  const prevEnergyRef = useRef<number>(me?.energy ?? 0);
+  useEffect(() => {
+    if (me?.role !== 'saboteur' || !me.saboteurClass) return;
+    const prev = prevEnergyRef.current;
+    const current = me.energy;
+    prevEnergyRef.current = current;
+    if (current > prev) {
+      const cls = SABOTEUR_CLASSES[me.saboteurClass];
+      const abilities = [...cls.abilities, cls.specialAbility].map((id) => ABILITIES[id]);
+      const newlyAffordable = abilities.some((ab) => prev < ab.cost && current >= ab.cost);
+      if (newlyAffordable) {
+        sfx.playAffordable();
+      }
+    }
+  }, [me?.energy, me?.role, me?.saboteurClass]);
+
   // Lead writer headline submission state
   const [headlineInput, setHeadlineInput] = useState('');
 
@@ -179,6 +196,12 @@ export function BroadcastScreen({
   const [targetingAbility, setTargetingAbility] = useState<AbilityId | null>(null);
   const lastReactionTapRef = useRef<number>(0);
 
+  const triggerHaptic = (ms: number = 10) => {
+    try {
+      navigator.vibrate?.(ms);
+    } catch {}
+  };
+
   const isForcedBrush = snapshot.effects.forcedBrushUntil > now;
   const forcedBrushRemaining = isForcedBrush
     ? Math.max(0, Math.ceil((snapshot.effects.forcedBrushUntil - now) / 1000))
@@ -189,9 +212,17 @@ export function BroadcastScreen({
     ? FORCED_BRUSH.widthNorm
     : BRUSH_WIDTHS[selectedBrushSize];
 
-  // Wipers cooldown
+  // Cooldowns
   const wipersRemaining = me?.wipersCooldownUntil
     ? Math.max(0, Math.ceil((me.wipersCooldownUntil - now) / 1000))
+    : 0;
+
+  const shieldRemaining = me?.shieldCooldownUntil
+    ? Math.max(0, Math.ceil((me.shieldCooldownUntil - now) / 1000))
+    : 0;
+
+  const breakingNewsRemaining = me?.breakingNewsCooldownUntil
+    ? Math.max(0, Math.ceil((me.breakingNewsCooldownUntil - now) / 1000))
     : 0;
 
   // --- Handlers ---
@@ -253,6 +284,7 @@ export function BroadcastScreen({
 
   const handleTargetClick = (normX: number, normY: number) => {
     if (targetingAbility) {
+      triggerHaptic(15);
       send({ type: 'USE_ABILITY', abilityId: targetingAbility, x: normX, y: normY });
       setTargetingAbility(null);
     }
@@ -321,6 +353,7 @@ export function BroadcastScreen({
     }
 
     if (brushMode === 'stamp' && !isForcedBrush) {
+      triggerHaptic(10);
       const stampId = selectedStamp.id;
       const id = Math.random().toString(36).slice(2) + Date.now();
       send({
@@ -336,6 +369,7 @@ export function BroadcastScreen({
     }
 
     // Stroke mode
+    triggerHaptic(10);
     const id = Math.random().toString(36).slice(2) + Date.now();
     currentStrokeIdRef.current = id;
     strokeBufferRef.current = [{ x: normX, y: normY }];
@@ -730,6 +764,7 @@ export function BroadcastScreen({
                   onClick={() => {
                     setSelectedColor(c);
                     setBrushMode('stroke');
+                    triggerHaptic(10);
                   }}
                   style={{
                     width: '28px',
@@ -744,6 +779,28 @@ export function BroadcastScreen({
                   title={c === '#FFFFFF' ? 'Ластик / Белый' : c}
                 />
               ))}
+
+              {/* Neon Rainbow brush tool */}
+              <button
+                type="button"
+                disabled={isForcedBrush || segment.phase !== 'LIVE'}
+                onClick={() => {
+                  setSelectedColor('#RAINBOW');
+                  setBrushMode('stroke');
+                  triggerHaptic(12);
+                }}
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: 'conic-gradient(#ef4444, #f59e0b, #10b981, #06b6d4, #8b5cf6, #ec4899, #ef4444)',
+                  border: selectedColor === '#RAINBOW' && brushMode === 'stroke' ? '3px solid #ffffff' : '1px solid #475569',
+                  boxShadow: selectedColor === '#RAINBOW' ? '0 0 10px rgba(6, 182, 212, 0.9)' : 'none',
+                  cursor: segment.phase === 'LIVE' ? 'pointer' : 'not-allowed',
+                  padding: 0,
+                }}
+                title="Неоновая радужная кисть"
+              />
             </div>
 
             {/* Brush sizes */}
@@ -766,6 +823,7 @@ export function BroadcastScreen({
                   onClick={() => {
                     setSelectedBrushSize(sz);
                     setBrushMode('stroke');
+                    triggerHaptic(8);
                   }}
                   className="btn btn-sm"
                   style={{
@@ -786,7 +844,10 @@ export function BroadcastScreen({
               type="button"
               className={`btn btn-sm ${brushMode === 'stamp' ? 'btn-accent' : 'btn-secondary'}`}
               disabled={segment.phase !== 'LIVE'}
-              onClick={() => setStampsDrawerOpen(!stampsDrawerOpen)}
+              onClick={() => {
+                triggerHaptic(8);
+                setStampsDrawerOpen(!stampsDrawerOpen);
+              }}
               style={{ flexShrink: 0 }}
             >
               <span>{selectedStamp.icon}</span>
@@ -798,11 +859,29 @@ export function BroadcastScreen({
               type="button"
               className="btn btn-secondary btn-sm"
               disabled={segment.phase !== 'LIVE'}
-              onClick={() => send({ type: 'UNDO_LAST' })}
+              onClick={() => {
+                triggerHaptic(8);
+                send({ type: 'UNDO_LAST' });
+              }}
               title="Отменить последний штрих"
               style={{ flexShrink: 0 }}
             >
               <Undo2 size={14} />
+            </button>
+
+            {/* Shield */}
+            <button
+              type="button"
+              className={`btn btn-sm ${shieldRemaining > 0 ? 'btn-secondary' : 'btn-accent'}`}
+              disabled={shieldRemaining > 0 || segment.phase !== 'LIVE'}
+              onClick={() => {
+                triggerHaptic(15);
+                send({ type: 'USE_SHIELD' });
+              }}
+              title="Защитный экран: блокирует любые пакости саботажников на 4 секунды (откат 12с)"
+              style={{ flexShrink: 0, fontWeight: 700 }}
+            >
+              🛡️ {shieldRemaining > 0 ? `${shieldRemaining}с` : 'Защита'}
             </button>
 
             {/* Wipers */}
@@ -810,7 +889,10 @@ export function BroadcastScreen({
               type="button"
               className={`btn btn-sm ${wipersRemaining > 0 ? 'btn-secondary' : 'btn-warning'}`}
               disabled={wipersRemaining > 0 || segment.phase !== 'LIVE'}
-              onClick={() => send({ type: 'USE_WIPERS' })}
+              onClick={() => {
+                triggerHaptic(15);
+                send({ type: 'USE_WIPERS' });
+              }}
               title="Счистить все пакости дворниками (откат 7с)"
               style={{ flexShrink: 0 }}
             >
@@ -1076,25 +1158,62 @@ export function BroadcastScreen({
               </button>
             </form>
 
-            {/* Quick headline inject suggestions */}
+            {/* Quick headline inject suggestions & starters */}
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {[
-                'Очевидцы в шоке!',
-                'Полиция перекрыла район!',
-                'Никто не знает, что делать!',
-                'Ситуация накаляется!',
-              ].map((sug) => (
+                '⚡ СРОЧНО: ',
+                '😱 ШОК: ',
+                '👀 СВИДЕТЕЛИ: ',
+                '🔬 УЧЕНЫЕ: ',
+                '🔥 СЕНСАЦИЯ: ',
+                '🚨 ВНИМАНИЕ: ',
+              ].map((prefix) => (
                 <button
-                  key={sug}
+                  key={prefix}
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  style={{ fontSize: '11px', padding: '4px 8px' }}
+                  style={{ fontSize: '11px', padding: '3px 8px' }}
                   disabled={segment.phase !== 'LIVE'}
-                  onClick={() => setTickerInput(sug)}
+                  onClick={() => {
+                    triggerHaptic(8);
+                    setTickerInput((prev) => (prev ? `${prefix}${prev}` : prefix));
+                  }}
                 >
-                  + {sug}
+                  {prefix}
                 </button>
               ))}
+            </div>
+
+            {/* Writer Action Bar: Breaking News Alert & Anti-Hack */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${breakingNewsRemaining > 0 ? 'btn-secondary' : 'btn-warning'}`}
+                disabled={breakingNewsRemaining > 0 || segment.phase !== 'LIVE'}
+                onClick={() => {
+                  triggerHaptic(15);
+                  send({ type: 'USE_BREAKING_NEWS' });
+                }}
+                style={{ flex: 1, fontWeight: 800 }}
+                title="МОЛНИЯ В КАДР: Экстренная плашка и сирена на весь экран прямого эфира (откат 12с)"
+              >
+                ⚡ {breakingNewsRemaining > 0 ? `Молния (${breakingNewsRemaining}с)` : 'Молния в кадр!'}
+              </button>
+
+              {snapshot.ticker.some((m) => m.hackedText) && (
+                <button
+                  type="button"
+                  className="btn btn-danger btn-sm"
+                  style={{ fontWeight: 800, animation: 'pulse-live 1s infinite' }}
+                  onClick={() => {
+                    triggerHaptic(15);
+                    send({ type: 'CLEAN_TICKER' });
+                  }}
+                  title="Анти-хак редактора: моментально очистить взломанные символы и восстановить текст строки"
+                >
+                  🛠️ Анти-хак: Очистить строку!
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1142,10 +1261,13 @@ export function BroadcastScreen({
               </div>
             </div>
 
-            {/* 3 Class Abilities */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+            {/* 4 Class Abilities (3 Core + 1 Special) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
               {me.saboteurClass &&
-                SABOTEUR_CLASSES[me.saboteurClass].abilities.map((abId) => {
+                [
+                  ...SABOTEUR_CLASSES[me.saboteurClass].abilities,
+                  SABOTEUR_CLASSES[me.saboteurClass].specialAbility,
+                ].map((abId) => {
                   const ab = ABILITIES[abId];
                   const hasEnergy = me.energy >= ab.cost;
                   const isAiming = targetingAbility === abId;
@@ -1156,23 +1278,33 @@ export function BroadcastScreen({
                       type="button"
                       className="card"
                       disabled={!hasEnergy || segment.phase !== 'LIVE'}
-                      onClick={() => handleAbilityClick(abId)}
+                      onClick={() => {
+                        triggerHaptic(12);
+                        handleAbilityClick(abId);
+                      }}
+                      title={`${ab.name}: ${ab.shortDesc} (Стоимость: ${ab.cost}⚡)`}
                       style={{
-                        padding: '8px',
+                        padding: '8px 4px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px',
+                        gap: '3px',
                         textAlign: 'center',
                         cursor: hasEnergy ? 'pointer' : 'not-allowed',
-                        border: isAiming ? '2px solid #ef4444' : '1px solid var(--border)',
+                        border: isAiming
+                          ? '2px solid #ef4444'
+                          : hasEnergy
+                            ? '1px solid var(--amber)'
+                            : '1px solid var(--border)',
                         background: isAiming
-                          ? 'rgba(239, 68, 68, 0.2)'
+                          ? 'rgba(239, 68, 68, 0.25)'
                           : hasEnergy
                             ? 'var(--surface-2)'
                             : 'rgba(27, 36, 56, 0.4)',
                         opacity: hasEnergy && segment.phase === 'LIVE' ? 1 : 0.45,
+                        boxShadow: hasEnergy ? '0 0 10px rgba(245, 158, 11, 0.25)' : 'none',
+                        transition: 'all 0.15s ease',
                       }}
                     >
                       <span style={{ fontSize: '20px' }}>{ab.icon}</span>
@@ -1186,7 +1318,20 @@ export function BroadcastScreen({
                       >
                         {ab.name}
                       </div>
-                      <div className="badge badge-amber" style={{ fontSize: '10px', padding: '1px 6px' }}>
+                      <div
+                        style={{
+                          fontSize: '9px',
+                          color: 'var(--muted)',
+                          lineHeight: '1.1',
+                          maxWidth: '100%',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {ab.shortDesc}
+                      </div>
+                      <div className="badge badge-amber" style={{ fontSize: '10px', padding: '1px 6px', marginTop: '2px' }}>
                         {ab.cost} ⚡
                       </div>
                     </button>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CanvasDrawItem, SabotageVisualItem, ActiveEffectsState, TickerMessage } from '@shared/protocol';
 import { renderTvCanvas } from '../engine/canvasRender';
 import { TIMINGS } from '@shared/constants';
@@ -50,9 +50,29 @@ export function TvDisplay({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
+  const [renderTick, setRenderTick] = useState(0);
   const now = Date.now() + clockOffsetMs;
   const isFlipped = effects.flippedUntil > now;
   const isGlitching = effects.glitchUntil > now;
+
+  useEffect(() => {
+    const untils = [
+      effects.breakingNewsUntil ?? 0,
+      effects.shieldUntil ?? 0,
+      effects.glitchUntil ?? 0,
+      effects.flippedUntil ?? 0,
+      effects.wipersAnimUntil ?? 0,
+      effects.staticNoiseUntil ?? 0,
+      effects.shakeUntil ?? 0,
+    ].filter((u) => u > now);
+    if (untils.length === 0) return;
+    const nextTimeout = Math.min(...untils) - now;
+    if (nextTimeout <= 0) return;
+    const timer = setTimeout(() => {
+      setRenderTick((t) => t + 1);
+    }, nextTimeout + 40);
+    return () => clearTimeout(timer);
+  }, [effects, now, renderTick]);
 
   const getNormCoords = (clientX: number, clientY: number) => {
     if (!canvasRef.current) return { x: 0.5, y: 0.5 };
@@ -79,6 +99,7 @@ export function TvDisplay({
       if (!isSubscribed) return;
       const now = Date.now() + clockOffsetMs;
       const isGlitching = effects.glitchUntil > now;
+      const isShielded = (effects.shieldUntil ?? 0) > now;
       let wipersProgress: number | null = null;
       if (effects.wipersAnimUntil > now) {
         const remaining = effects.wipersAnimUntil - now;
@@ -91,10 +112,11 @@ export function TvDisplay({
         sabotageItems,
         isGlitching,
         wipersProgress,
+        isShielded,
       });
 
       // Keep rendering while dynamic animations are active
-      if (isGlitching || wipersProgress !== null) {
+      if (isGlitching || wipersProgress !== null || isShielded) {
         animFrameRef.current = requestAnimationFrame(render);
       }
     };
@@ -113,8 +135,8 @@ export function TvDisplay({
     <div className="aspect-16-9-wrap">
       <div
         className={`tv-frame ${isFlipped ? 'flipped' : ''} ${isGlitching ? 'glitch-shake' : ''} ${
-          isTargeting ? 'crosshair-cursor' : ''
-        }`}
+          (effects.shakeUntil ?? 0) > now ? 'camera-shake' : ''
+        } ${isTargeting ? 'crosshair-cursor' : ''}`}
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -210,6 +232,71 @@ export function TvDisplay({
 
         {/* Floating Emojis */}
         <FloatingReactions reactions={reactions} />
+
+        {/* Static TV Snow Noise Overlay */}
+        {(effects.staticNoiseUntil ?? 0) > now && <div className="static-noise-overlay" />}
+
+        {/* Breaking News Flash Overlay */}
+        {(effects.breakingNewsUntil ?? 0) > now && (
+          <div
+            className="breaking-news-overlay"
+            style={{
+              position: 'absolute',
+              top: '25%',
+              left: 0,
+              right: 0,
+              zIndex: 35,
+              background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.95), rgba(245, 158, 11, 0.95), rgba(239, 68, 68, 0.95))',
+              color: '#ffffff',
+              padding: '10px 16px',
+              textAlign: 'center',
+              boxShadow: '0 0 30px rgba(239, 68, 68, 0.8), 0 4px 16px rgba(0,0,0,0.6)',
+              borderTop: '2px solid #ffffff',
+              borderBottom: '2px solid #ffffff',
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 900, letterSpacing: '2px', color: '#fef08a' }}>
+              ⚡ ЭКСТРЕННАЯ МОЛНИЯ В ЭФИРЕ ⚡
+            </div>
+            <div
+              style={{
+                fontSize: 'clamp(14px, 3.2cqh, 22px)',
+                fontWeight: 900,
+                textTransform: 'uppercase',
+                textShadow: '0 2px 4px #000',
+              }}
+            >
+              {effects.breakingNewsAuthor
+                ? `СПЕЦКОР ${effects.breakingNewsAuthor} ПЕРЕДАЕТ СРОЧНО!`
+                : 'СРОЧНОЕ ВКЛЮЧЕНИЕ ИЗ ЦЕНТРА СОБЫТИЙ!'}
+            </div>
+          </div>
+        )}
+
+        {/* Shield active badge overlay */}
+        {(effects.shieldUntil ?? 0) > now && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '12px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 30,
+              background: 'rgba(6, 182, 212, 0.92)',
+              color: '#090d16',
+              padding: '3px 12px',
+              borderRadius: '999px',
+              fontSize: '11px',
+              fontWeight: 900,
+              letterSpacing: '1px',
+              boxShadow: '0 0 16px rgba(6, 182, 212, 0.85)',
+              pointerEvents: 'none',
+            }}
+          >
+            🛡️ ЗАЩИТНЫЙ ЭКРАН АКТИВЕН
+          </div>
+        )}
 
         {/* Bottom Ticker overlay (for TV view) */}
         {showOverlays && (

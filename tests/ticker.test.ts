@@ -255,4 +255,37 @@ describe('Ticker Mechanics & Smooth Appending Unit Tests', () => {
     };
     assert.equal(loopedItem.isFresh, false);
   });
+
+  it('9. Anti-Hack cleans hackedText from track items back to undefined', () => {
+    interface TrackItem {
+      uid: string;
+      msgId: string;
+      text: string;
+      hackedText?: string;
+    }
+
+    const trackItems: TrackItem[] = [
+      { uid: 'u1', msgId: 'm1', text: 'Clean headline', hackedText: 'CL3@N H3@DL!N3' },
+      { uid: 'u2', msgId: 'm2', text: 'Second headline', hackedText: undefined },
+    ];
+
+    // Live messages from server after CLEAN_TICKER (hackedText is deleted)
+    const liveMessages: TickerMessage[] = [
+      { id: 'm1', authorName: 'Автор', text: 'Clean headline', createdAt: 1000 },
+      { id: 'm2', authorName: 'Автор', text: 'Second headline', createdAt: 2000 },
+    ];
+
+    let hackUpdated = false;
+    for (const item of trackItems) {
+      const liveMsg = liveMessages.find((m) => m.id === item.msgId);
+      if (liveMsg && item.hackedText !== liveMsg.hackedText) {
+        item.hackedText = liveMsg.hackedText;
+        hackUpdated = true;
+      }
+    }
+
+    assert.equal(hackUpdated, true, 'hackUpdated must be true after cleaning');
+    assert.equal(trackItems[0].hackedText, undefined, 'trackItem m1 hackedText must be cleared');
+    assert.equal(trackItems[0].text, 'Clean headline', 'original text preserved');
+  });
 });

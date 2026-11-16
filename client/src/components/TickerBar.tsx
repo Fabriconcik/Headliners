@@ -16,7 +16,7 @@ interface TrackItem {
   isFresh: boolean;
 }
 
-const SPEED_PX_PER_SEC = 55; // Steady, comfortable reading speed for broadcast news
+const SPEED_PX_PER_SEC = 90; // Accelerated dynamic speed (~85-95 px/sec) to maximize visible updates
 
 function getPlaylist(messages: TickerMessage[], headline?: string): TickerMessage[] {
   const items: TickerMessage[] = [];
@@ -157,12 +157,16 @@ export function TickerBar({ messages, headline }: Props) {
       }
     }
 
-    // 4. Also check if any message was hacked
+    // 4. Also check if any message was hacked OR un-hacked (Anti-Hack clean)
     let hackUpdated = false;
     for (const item of trackItemsRef.current) {
       const liveMsg = messages.find((m) => m.id === item.msgId);
-      if (liveMsg && liveMsg.hackedText && liveMsg.hackedText !== item.hackedText) {
+      if (liveMsg && item.hackedText !== liveMsg.hackedText) {
         item.hackedText = liveMsg.hackedText;
+        hackUpdated = true;
+      }
+      if (liveMsg && item.text !== liveMsg.text) {
+        item.text = liveMsg.text;
         hackUpdated = true;
       }
     }
@@ -336,19 +340,24 @@ export function TickerBar({ messages, headline }: Props) {
         {isFresh && (
           <span
             className="ticker-badge-new"
+            title="Новое сообщение"
             style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               background: '#facc15',
               color: '#090d16',
-              fontSize: '9px',
-              padding: '1px 5px',
-              borderRadius: '3px',
+              fontSize: '10px',
+              width: '14px',
+              height: '14px',
+              borderRadius: '50%',
               fontWeight: 900,
-              letterSpacing: '0.5px',
-              boxShadow: '0 0 8px rgba(250, 204, 21, 0.7)',
-              textTransform: 'uppercase',
+              boxShadow: '0 0 8px rgba(250, 204, 21, 0.85), 0 0 2px #fff',
+              flexShrink: 0,
+              lineHeight: 1,
             }}
           >
-            НОВОЕ
+            ⚡
           </span>
         )}
 

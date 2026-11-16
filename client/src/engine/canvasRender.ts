@@ -6,6 +6,7 @@ export interface RenderCanvasOptions {
   sabotageItems: SabotageVisualItem[];
   isGlitching: boolean;
   wipersProgress: number | null; // 0..1 when active, null otherwise
+  isShielded?: boolean;
 }
 
 export function renderTvCanvas(
@@ -61,6 +62,11 @@ export function renderTvCanvas(
   if (opts.isGlitching) {
     drawGlitchOverlay(ctx, width, height);
   }
+
+  // 6. Shield forcefield overlay
+  if (opts.isShielded) {
+    drawShieldOverlay(ctx, width, height);
+  }
 }
 
 function drawStroke(
@@ -71,18 +77,40 @@ function drawStroke(
 ): void {
   if (item.points.length === 0) return;
   ctx.save();
-  ctx.strokeStyle = item.color;
-  ctx.fillStyle = item.color;
+  const isRainbow = item.color.toLowerCase() === '#rainbow' || item.color.toLowerCase() === 'rainbow';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   const lineWidth = Math.max(2, item.widthNorm * height);
   ctx.lineWidth = lineWidth;
 
+  if (isRainbow) {
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = '#06b6d4';
+  } else {
+    ctx.strokeStyle = item.color;
+    ctx.fillStyle = item.color;
+  }
+
   if (item.points.length === 1) {
     const p = item.points[0];
     ctx.beginPath();
+    ctx.fillStyle = isRainbow ? '#06b6d4' : item.color;
     ctx.arc(p.x * width, p.y * height, lineWidth / 2, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  if (isRainbow) {
+    for (let i = 0; i < item.points.length - 1; i++) {
+      const p1 = item.points[i];
+      const p2 = item.points[i + 1];
+      ctx.beginPath();
+      ctx.strokeStyle = `hsl(${(i * 18) % 360}, 100%, 50%)`;
+      ctx.moveTo(p1.x * width, p1.y * height);
+      ctx.lineTo(p2.x * width, p2.y * height);
+      ctx.stroke();
+    }
     ctx.restore();
     return;
   }
@@ -541,6 +569,38 @@ function drawSabotageItem(
     ctx.beginPath();
     ctx.ellipse(0, 0, radius * 0.06, radius * 0.9, sab.rotation, 0, Math.PI * 2);
     ctx.fill();
+  } else if (sab.type === 'ink_splat') {
+    // Jet black viscous ink splat with droplets and glossy specular
+    ctx.fillStyle = '#090d16';
+    ctx.beginPath();
+    ctx.arc(0, 0, unit * 0.72, 0, Math.PI * 2);
+    ctx.fill();
+
+    const lobes = [
+      { x: unit * 0.7, y: -unit * 0.35, r: unit * 0.3 },
+      { x: -unit * 0.65, y: -unit * 0.45, r: unit * 0.34 },
+      { x: unit * 0.45, y: unit * 0.72, r: unit * 0.36 },
+      { x: -unit * 0.52, y: unit * 0.62, r: unit * 0.3 },
+      { x: 0, y: unit * 0.96, r: unit * 0.25 },
+      { x: -unit * 0.92, y: 0, r: unit * 0.24 },
+      { x: unit * 0.88, y: unit * 0.18, r: unit * 0.28 },
+      { x: unit * 1.15, y: -unit * 0.6, r: unit * 0.12 },
+      { x: -unit * 1.2, y: unit * 0.4, r: unit * 0.14 },
+    ];
+    for (const d of lobes) {
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Glossy oily highlights
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(-unit * 0.22, -unit * 0.22, unit * 0.22, unit * 0.1, -Math.PI / 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(unit * 0.25, unit * 0.25, unit * 0.08, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
@@ -598,5 +658,53 @@ function drawGlitchOverlay(
           : 'rgba(255, 255, 255, 0.22)';
     ctx.fillRect(0, y, width, h);
   }
+  ctx.restore();
+}
+
+function drawShieldOverlay(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): void {
+  ctx.save();
+  // Glowing cyan protective forcefield border
+  ctx.strokeStyle = '#06b6d4';
+  ctx.lineWidth = Math.max(4, height * 0.012);
+  ctx.shadowColor = '#06b6d4';
+  ctx.shadowBlur = 14;
+  ctx.strokeRect(6, 6, width - 12, height - 12);
+
+  // Corner tech brackets
+  const bracketLen = Math.max(30, width * 0.05);
+  ctx.lineWidth = Math.max(6, height * 0.018);
+  ctx.strokeStyle = '#38bdf8';
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(12, 12 + bracketLen);
+  ctx.lineTo(12, 12);
+  ctx.lineTo(12 + bracketLen, 12);
+  ctx.stroke();
+  // Top-right
+  ctx.beginPath();
+  ctx.moveTo(width - 12 - bracketLen, 12);
+  ctx.lineTo(width - 12, 12);
+  ctx.lineTo(width - 12, 12 + bracketLen);
+  ctx.stroke();
+  // Bottom-left
+  ctx.beginPath();
+  ctx.moveTo(12, height - 12 - bracketLen);
+  ctx.lineTo(12, height - 12);
+  ctx.lineTo(12 + bracketLen, height - 12);
+  ctx.stroke();
+  // Bottom-right
+  ctx.beginPath();
+  ctx.moveTo(width - 12 - bracketLen, height - 12);
+  ctx.lineTo(width - 12, height - 12);
+  ctx.lineTo(width - 12, height - 12 - bracketLen);
+  ctx.stroke();
+
+  // Subtle forcefield tint
+  ctx.fillStyle = 'rgba(6, 182, 212, 0.06)';
+  ctx.fillRect(0, 0, width, height);
   ctx.restore();
 }

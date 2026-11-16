@@ -30,6 +30,12 @@ export const TIMINGS = {
   FREEZE_MS: 3_000,
   WIPERS_COOLDOWN_MS: 7_000,
   WIPERS_ANIM_MS: 900,
+  SHIELD_COOLDOWN_MS: 12_000,
+  SHIELD_DURATION_MS: 4_000,
+  BREAKING_NEWS_COOLDOWN_MS: 12_000,
+  BREAKING_NEWS_DURATION_MS: 3_000,
+  STATIC_NOISE_DURATION_MS: 3_000,
+  SHAKE_DURATION_MS: 3_500,
   HACKER_TICKER_DELAY_MS: 3_000,
   FLIP_DURATION_MS: 4_000,
   GLITCH_DURATION_MS: 2_800,
@@ -78,7 +84,10 @@ export type AbilityId =
   | 'flip'
   | 'censor'
   | 'forced_brush'
-  | 'spotlight';
+  | 'spotlight'
+  | 'ink_splat'
+  | 'static_noise'
+  | 'camera_shake';
 
 export type SaboteurAbilityId = AbilityId;
 
@@ -120,6 +129,15 @@ export const ABILITIES: Record<AbilityId, AbilityConfig> = {
     positional: true,
     icon: '🕸️',
   },
+  ink_splat: {
+    id: 'ink_splat',
+    saboteurClass: 'vandal',
+    name: 'Масляная клякса',
+    shortDesc: 'Черная жирная клякса на холст',
+    cost: 30,
+    positional: true,
+    icon: '🖤',
+  },
   ticker_hack: {
     id: 'ticker_hack',
     saboteurClass: 'hacker',
@@ -146,6 +164,15 @@ export const ABILITIES: Record<AbilityId, AbilityConfig> = {
     cost: 65,
     positional: false,
     icon: '🙃',
+  },
+  static_noise: {
+    id: 'static_noise',
+    saboteurClass: 'hacker',
+    name: 'Шум эфира / Помехи',
+    shortDesc: 'Белый телевизионный шум на 3 сек',
+    cost: 40,
+    positional: false,
+    icon: '📡',
   },
   censor: {
     id: 'censor',
@@ -174,34 +201,53 @@ export const ABILITIES: Record<AbilityId, AbilityConfig> = {
     positional: true,
     icon: '🔦',
   },
+  camera_shake: {
+    id: 'camera_shake',
+    saboteurClass: 'director',
+    name: 'Землетрясение / Тряска',
+    shortDesc: 'Мощное землетрясение и дрожание камеры 3.5с',
+    cost: 45,
+    positional: false,
+    icon: '📳',
+  },
 };
 
 export const SABOTEUR_ABILITIES = ABILITIES;
 
 export const SABOTEUR_CLASSES: Record<
   SaboteurClass,
-  { id: SaboteurClass; name: string; subtitle: string; icon: string; abilities: AbilityId[] }
+  {
+    id: SaboteurClass;
+    name: string;
+    subtitle: string;
+    icon: string;
+    abilities: AbilityId[];
+    specialAbility: AbilityId;
+  }
 > = {
   vandal: {
     id: 'vandal',
     name: 'Вандал',
-    subtitle: 'Помидоры, стикеры и трещины на камере',
+    subtitle: 'Помидоры, стикеры, трещины и чернила',
     icon: '🍅',
     abilities: ['tomato', 'sticker', 'crack'],
+    specialAbility: 'ink_splat',
   },
   hacker: {
     id: 'hacker',
     name: 'Хакер',
-    subtitle: 'Взлом строки, глитч и переворот кадра',
+    subtitle: 'Взлом строки, глитч, переворот и помехи',
     icon: '👾',
     abilities: ['ticker_hack', 'glitch', 'flip'],
+    specialAbility: 'static_noise',
   },
   director: {
     id: 'director',
     name: 'Режиссер-вредитель',
-    subtitle: 'Плашки ЦЕНЗУРА, софиты и кислотная кисть',
+    subtitle: 'Плашки ЦЕНЗУРА, софиты, розовая кисть и землетрясение',
     icon: '🎬',
     abilities: ['censor', 'forced_brush', 'spotlight'],
+    specialAbility: 'camera_shake',
   },
 };
 

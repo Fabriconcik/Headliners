@@ -140,8 +140,10 @@ export function buildReplayPayload(
       for (const ev of roundEvents) {
         if (ev.t >= t_s && ev.t <= t_e) {
           if (ev.type === 'SABOTAGE_VISUAL' || ev.type === 'SABOTAGE_FX') score += 5.0;
+          else if (ev.type === 'BREAKING_NEWS') score += 4.5;
           else if (ev.type === 'TICKER_HACK') score += 4.0;
-          else if (ev.type === 'WIPERS') score += 3.0;
+          else if (ev.type === 'SHIELD' || ev.type === 'WIPERS') score += 3.0;
+          else if (ev.type === 'TICKER_CLEAN') score += 2.5;
           else if (ev.type === 'REACTION') score += 1.5;
           else if (ev.type === 'STAMP_ADD' || ev.type === 'UNDO_ITEM') score += 0.5;
         }

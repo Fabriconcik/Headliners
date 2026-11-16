@@ -129,6 +129,134 @@ class SoundEngine {
     osc.start(now);
     osc.stop(now + 0.08);
   }
+
+  public playShield(): void {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.18);
+    osc.frequency.exponentialRampToValueAtTime(640, now + 0.35);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.14, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.4);
+  }
+
+  public playBreakingNews(): void {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    // Two alternating dramatic alert bursts + high impact trumpet tone
+    [0, 0.14, 0.28].forEach((offset, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(idx % 2 === 0 ? 880 : 1174, now + offset);
+      gain.gain.setValueAtTime(0.12, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.11);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.12);
+    });
+  }
+
+  public playClean(): void {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [440, 554, 659, 880];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + i * 0.05);
+      gain.gain.setValueAtTime(0.08, now + i * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.05);
+      osc.stop(now + i * 0.05 + 0.14);
+    });
+  }
+
+  public playClick(): void {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(200, now + 0.03);
+    gain.gain.setValueAtTime(0.06, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
+
+  public playAffordable(): void {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(987.77, now); // B5
+    osc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.08); // E6
+    gain.gain.setValueAtTime(0.04, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.13);
+  }
+
+  public playStatic(): void {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    // Synthesized harsh white TV snow burst
+    for (let i = 0; i < 5; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(200 + Math.random() * 1200, now + i * 0.05);
+      gain.gain.setValueAtTime(0.09, now + i * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.045);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.05);
+      osc.stop(now + i * 0.05 + 0.05);
+    }
+  }
+
+  public playRumble(): void {
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(75, now);
+    osc.frequency.exponentialRampToValueAtTime(35, now + 0.45);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.22, now + 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.5);
+  }
 }
 
 export const sfx = new SoundEngine();
