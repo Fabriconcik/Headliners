@@ -273,7 +273,7 @@ export function useGameSocket() {
           if (!prev) return prev;
           return {
             ...prev,
-            ticker: [...prev.ticker.slice(-14), msg.message],
+            ticker: [...prev.ticker.slice(-20), msg.message],
           };
         });
         return;

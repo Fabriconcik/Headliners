@@ -142,48 +142,172 @@ function drawSabotageItem(
   ctx.rotate(sab.rotation);
 
   if (sab.type === 'tomato') {
-    // Splat blob
-    ctx.fillStyle = '#dc2626';
-    ctx.beginPath();
-    const lobes = 9;
-    for (let i = 0; i <= lobes * 2; i++) {
-      const ang = (i * Math.PI) / lobes;
-      const r = i % 2 === 0 ? unit * 1.05 : unit * 0.62;
-      const px = Math.cos(ang) * r;
-      const py = Math.sin(ang) * r;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+    // 1. Sauce splatters & droplets (outer background layer)
+    ctx.fillStyle = '#b91c1c';
+    const droplets = [
+      { x: -unit * 1.15, y: -unit * 0.5, r: unit * 0.14 },
+      { x: unit * 1.1, y: -unit * 0.65, r: unit * 0.12 },
+      { x: -unit * 1.25, y: unit * 0.45, r: unit * 0.15 },
+      { x: unit * 1.2, y: unit * 0.55, r: unit * 0.18 },
+      { x: -unit * 0.45, y: -unit * 1.05, r: unit * 0.13 },
+      { x: unit * 0.5, y: -unit * 0.95, r: unit * 0.14 },
+      { x: -unit * 0.8, y: unit * 1.05, r: unit * 0.1 },
+      { x: unit * 0.85, y: unit * 1.0, r: unit * 0.12 },
+    ];
+    for (const d of droplets) {
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
     }
+
+    // Dripping sauce trails downwards
+    ctx.beginPath();
+    ctx.moveTo(-unit * 0.45, unit * 0.4);
+    ctx.quadraticCurveTo(-unit * 0.55, unit * 0.95, -unit * 0.38, unit * 1.2);
+    ctx.arc(-unit * 0.38, unit * 1.25, unit * 0.12, 0, Math.PI * 2);
+    ctx.quadraticCurveTo(-unit * 0.25, unit * 0.85, -unit * 0.15, unit * 0.5);
+
+    ctx.moveTo(unit * 0.25, unit * 0.4);
+    ctx.quadraticCurveTo(unit * 0.45, unit * 0.85, unit * 0.4, unit * 1.1);
+    ctx.arc(unit * 0.4, unit * 1.15, unit * 0.1, 0, Math.PI * 2);
+    ctx.quadraticCurveTo(unit * 0.25, unit * 0.8, unit * 0.1, unit * 0.5);
+    ctx.fill();
+
+    // 2. Main Plump Tomato Body with radial gradient
+    const bw = unit * 0.82;
+    const bh = unit * 0.68;
+    const bodyGrad = ctx.createRadialGradient(
+      -bw * 0.25,
+      -bh * 0.25,
+      unit * 0.08,
+      0,
+      bh * 0.1,
+      unit * 0.95,
+    );
+    bodyGrad.addColorStop(0, '#f43f5e'); // bright ripe red highlight
+    bodyGrad.addColorStop(0.5, '#dc2626'); // juicy tomato red
+    bodyGrad.addColorStop(1, '#991b1b'); // deep shadow rim
+
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, -bh * 0.7);
+    ctx.bezierCurveTo(bw * 0.55, -bh * 1.05, bw * 1.05, -bh * 0.2, bw * 0.95, bh * 0.45);
+    ctx.bezierCurveTo(bw * 0.85, bh * 0.95, bw * 0.3, bh * 1.05, 0, bh * 0.92);
+    ctx.bezierCurveTo(-bw * 0.3, bh * 1.05, -bw * 0.85, bh * 0.95, -bw * 0.95, bh * 0.45);
+    ctx.bezierCurveTo(-bw * 1.05, -bh * 0.2, -bw * 0.55, -bh * 1.05, 0, -bh * 0.7);
     ctx.closePath();
     ctx.fill();
 
-    // Juice drips
-    ctx.fillStyle = '#b91c1c';
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = Math.max(1.5, unit * 0.04);
+    ctx.stroke();
+
+    // 3. Glossy Specular Highlight (3D fruit reflection)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
     ctx.beginPath();
-    ctx.ellipse(-unit * 0.25, unit * 0.9, unit * 0.14, unit * 0.35, 0, 0, Math.PI * 2);
-    ctx.ellipse(unit * 0.3, unit * 0.78, unit * 0.1, unit * 0.28, 0, 0, Math.PI * 2);
+    ctx.ellipse(
+      -bw * 0.38,
+      -bh * 0.35,
+      bw * 0.26,
+      bh * 0.18,
+      -Math.PI / 5,
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
 
-    // Seeds & green stem
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.arc(-bw * 0.16, -bh * 0.45, unit * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Seeds in the splat edges
     ctx.fillStyle = '#fef08a';
-    for (let i = 0; i < 5; i++) {
-      const ang = (i * Math.PI * 2) / 5 + 0.3;
+    const seeds = [
+      { x: unit * 0.62, y: unit * 0.45, ang: 0.6 },
+      { x: -unit * 0.68, y: unit * 0.35, ang: -0.4 },
+      { x: unit * 0.28, y: unit * 0.72, ang: 1.2 },
+    ];
+    for (const s of seeds) {
       ctx.beginPath();
-      ctx.ellipse(
-        Math.cos(ang) * unit * 0.36,
-        Math.sin(ang) * unit * 0.36,
-        unit * 0.08,
-        unit * 0.04,
-        ang,
-        0,
-        Math.PI * 2,
-      );
+      ctx.ellipse(s.x, s.y, unit * 0.08, unit * 0.04, s.ang, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.fillStyle = '#15803d';
+
+    // 4. Distinct 5-Lobe Organic Green Tomato Calyx & Stem on top
+    ctx.fillStyle = '#16a34a';
+    ctx.strokeStyle = '#14532d';
+    ctx.lineWidth = Math.max(1, unit * 0.03);
+
+    const stemCenterX = 0;
+    const stemCenterY = -bh * 0.62;
+    const sepalAngles = [-1.57, -0.32, 0.95, 2.2, 3.45]; // 5 natural organic sepal directions
+    const sepalLengths = [unit * 0.44, unit * 0.38, unit * 0.42, unit * 0.4, unit * 0.46];
+
     ctx.beginPath();
-    ctx.arc(0, 0, unit * 0.14, 0, Math.PI * 2);
+    for (let s = 0; s < 5; s++) {
+      const ang = sepalAngles[s];
+      const len = sepalLengths[s];
+      const tipX = stemCenterX + Math.cos(ang) * len;
+      const tipY = stemCenterY + Math.sin(ang) * (len * 0.7);
+      const baseLeftX = stemCenterX + Math.cos(ang - 0.45) * (unit * 0.12);
+      const baseLeftY = stemCenterY + Math.sin(ang - 0.45) * (unit * 0.1);
+      const baseRightX = stemCenterX + Math.cos(ang + 0.45) * (unit * 0.12);
+      const baseRightY = stemCenterY + Math.sin(ang + 0.45) * (unit * 0.1);
+
+      if (s === 0) ctx.moveTo(baseLeftX, baseLeftY);
+      else ctx.lineTo(baseLeftX, baseLeftY);
+      ctx.quadraticCurveTo(
+        stemCenterX + Math.cos(ang - 0.15) * (len * 0.6),
+        stemCenterY + Math.sin(ang - 0.15) * (len * 0.5),
+        tipX,
+        tipY,
+      );
+      ctx.quadraticCurveTo(
+        stemCenterX + Math.cos(ang + 0.15) * (len * 0.6),
+        stemCenterY + Math.sin(ang + 0.15) * (len * 0.5),
+        baseRightX,
+        baseRightY,
+      );
+    }
+    ctx.closePath();
     ctx.fill();
+    ctx.stroke();
+
+    // Leaf vein accents
+    ctx.strokeStyle = '#15803d';
+    ctx.lineWidth = Math.max(1, unit * 0.02);
+    for (let s = 0; s < 5; s++) {
+      const ang = sepalAngles[s];
+      const len = sepalLengths[s] * 0.72;
+      ctx.beginPath();
+      ctx.moveTo(stemCenterX, stemCenterY);
+      ctx.lineTo(stemCenterX + Math.cos(ang) * len, stemCenterY + Math.sin(ang) * (len * 0.65));
+      ctx.stroke();
+    }
+
+    // Little central green stalk (pedicel) curving up
+    ctx.fillStyle = '#15803d';
+    ctx.strokeStyle = '#14532d';
+    ctx.lineWidth = Math.max(1, unit * 0.025);
+    ctx.beginPath();
+    ctx.moveTo(stemCenterX - unit * 0.05, stemCenterY);
+    ctx.quadraticCurveTo(
+      stemCenterX - unit * 0.08,
+      stemCenterY - unit * 0.22,
+      stemCenterX + unit * 0.02,
+      stemCenterY - unit * 0.32,
+    );
+    ctx.lineTo(stemCenterX + unit * 0.07, stemCenterY - unit * 0.3);
+    ctx.quadraticCurveTo(
+      stemCenterX + unit * 0.01,
+      stemCenterY - unit * 0.2,
+      stemCenterX + unit * 0.05,
+      stemCenterY,
+    );
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   } else if (sab.type === 'sticker') {
     const emoji = sab.sticker || '🤡';
     const fontSize = Math.round(unit * 1.85);
@@ -195,28 +319,183 @@ function drawSabotageItem(
     ctx.strokeText(emoji, 0, 0);
     ctx.fillText(emoji, 0, 0);
   } else if (sab.type === 'crack') {
-    const rays = 10;
-    ctx.strokeStyle = 'rgba(226, 232, 240, 0.92)';
-    ctx.lineWidth = Math.max(2, height * 0.004);
-    ctx.shadowColor = 'rgba(15, 23, 42, 0.85)';
-    ctx.shadowBlur = 4;
-    for (let i = 0; i < rays; i++) {
-      const ang = (i / rays) * Math.PI * 2 + 0.2;
-      const len = unit * (1.2 + (i % 3) * 0.65);
+    // Sharp shattered glass fracture system (sharp angular zig-zag fissures, ZERO spiderweb rings)
+    const crackRays = [
+      // Fissure 1: Upper-Right high velocity fracture
+      [
+        { x: 0, y: 0 },
+        { x: unit * 0.28, y: -unit * 0.35 },
+        { x: unit * 0.58, y: -unit * 0.48 },
+        { x: unit * 0.92, y: -unit * 0.82 },
+        { x: unit * 1.38, y: -unit * 0.95 },
+      ],
+      // Fissure 2: Lower-Right fracture
+      [
+        { x: 0, y: 0 },
+        { x: unit * 0.38, y: unit * 0.22 },
+        { x: unit * 0.72, y: unit * 0.55 },
+        { x: unit * 1.15, y: unit * 0.75 },
+        { x: unit * 1.52, y: unit * 0.88 },
+      ],
+      // Fissure 3: Downwards jagged fracture
+      [
+        { x: 0, y: 0 },
+        { x: -unit * 0.12, y: unit * 0.42 },
+        { x: -unit * 0.25, y: unit * 0.88 },
+        { x: -unit * 0.32, y: unit * 1.48 },
+      ],
+      // Fissure 4: Left jagged fracture
+      [
+        { x: 0, y: 0 },
+        { x: -unit * 0.45, y: unit * 0.15 },
+        { x: -unit * 0.82, y: -unit * 0.08 },
+        { x: -unit * 1.35, y: unit * 0.12 },
+      ],
+      // Fissure 5: Upper-Left fracture
+      [
+        { x: 0, y: 0 },
+        { x: -unit * 0.22, y: -unit * 0.42 },
+        { x: -unit * 0.52, y: -unit * 0.78 },
+        { x: -unit * 0.75, y: -unit * 1.38 },
+      ],
+    ];
+
+    // Dendritic secondary branch forks
+    const forkFissures = [
+      // Fork from Fissure 1
+      [
+        { x: unit * 0.58, y: -unit * 0.48 },
+        { x: unit * 0.85, y: -unit * 0.32 },
+        { x: unit * 1.28, y: -unit * 0.22 },
+      ],
+      // Fork from Fissure 2
+      [
+        { x: unit * 0.72, y: unit * 0.55 },
+        { x: unit * 0.98, y: unit * 0.38 },
+        { x: unit * 1.42, y: unit * 0.42 },
+      ],
+      // Fork from Fissure 4
+      [
+        { x: -unit * 0.82, y: -unit * 0.08 },
+        { x: -unit * 1.12, y: -unit * 0.38 },
+        { x: -unit * 1.48, y: -unit * 0.55 },
+      ],
+      // Fork from Fissure 5
+      [
+        { x: -unit * 0.52, y: -unit * 0.78 },
+        { x: -unit * 0.88, y: -unit * 0.95 },
+        { x: -unit * 1.22, y: -unit * 1.15 },
+      ],
+    ];
+
+    // Sharp acute transverse fracture chords creating wedge shards (NO concentric web rings!)
+    const shardChords = [
+      [ { x: unit * 0.28, y: -unit * 0.35 }, { x: unit * 0.85, y: -unit * 0.32 } ],
+      [ { x: unit * 0.38, y: unit * 0.22 }, { x: unit * 0.98, y: unit * 0.38 } ],
+      [ { x: -unit * 0.12, y: unit * 0.42 }, { x: -unit * 0.45, y: unit * 0.15 } ],
+      [ { x: -unit * 0.82, y: -unit * 0.08 }, { x: -unit * 0.52, y: -unit * 0.78 } ],
+      [ { x: unit * 0.92, y: -unit * 0.82 }, { x: unit * 1.28, y: -unit * 0.22 } ],
+    ];
+
+    // 1. Shard refraction fills (translucent icy glass wedge facets)
+    ctx.fillStyle = 'rgba(224, 242, 254, 0.2)';
+    ctx.beginPath();
+    ctx.moveTo(unit * 0.28, -unit * 0.35);
+    ctx.lineTo(unit * 0.58, -unit * 0.48);
+    ctx.lineTo(unit * 0.85, -unit * 0.32);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-unit * 0.45, unit * 0.15);
+    ctx.lineTo(-unit * 0.22, -unit * 0.42);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.15)';
+    ctx.beginPath();
+    ctx.moveTo(unit * 0.38, unit * 0.22);
+    ctx.lineTo(unit * 0.72, unit * 0.55);
+    ctx.lineTo(unit * 0.98, unit * 0.38);
+    ctx.closePath();
+    ctx.fill();
+
+    const drawPathList = (paths: Array<Array<{ x: number; y: number }>>) => {
+      for (const p of paths) {
+        ctx.beginPath();
+        for (let i = 0; i < p.length; i++) {
+          if (i === 0) ctx.moveTo(p[i].x, p[i].y);
+          else ctx.lineTo(p[i].x, p[i].y);
+        }
+        ctx.stroke();
+      }
+    };
+
+    // 2. Dark refraction line layer (deep shadow under fractures)
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.8)';
+    ctx.lineWidth = Math.max(3, height * 0.006);
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+
+    drawPathList(crackRays);
+    drawPathList(forkFissures);
+    drawPathList(shardChords);
+
+    // 3. Bright sharp white fractured edge layer
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
+    ctx.lineWidth = Math.max(1.5, height * 0.003);
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.7)';
+    ctx.shadowBlur = 2;
+
+    drawPathList(crackRays);
+    drawPathList(forkFissures);
+    drawPathList(shardChords);
+    ctx.shadowBlur = 0;
+
+    // 4. Pulverized impact epicenter: Frosted crushed glass halo FIRST
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.beginPath();
+    const rimPoints = 11;
+    for (let i = 0; i < rimPoints; i++) {
+      const a = (i * Math.PI * 2) / rimPoints;
+      const r = unit * (0.16 + (i % 3) * 0.06);
+      const px = Math.cos(a) * r;
+      const py = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Radiating high-speed micro-spall fractures
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1, height * 0.0025);
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI * 2) / 8 + 0.2;
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(ang) * len * 0.45, Math.sin(ang) * len * 0.45);
-      ctx.lineTo(
-        Math.cos(ang + 0.12) * len,
-        Math.sin(ang + 0.12) * len,
-      );
+      ctx.moveTo(Math.cos(a) * unit * 0.07, Math.sin(a) * unit * 0.07);
+      ctx.lineTo(Math.cos(a) * unit * 0.28, Math.sin(a) * unit * 0.28);
       ctx.stroke();
     }
+
+    // Epicenter impact puncture hole SECOND (sharp dark hole in center of white crater)
+    ctx.fillStyle = '#090d16';
     ctx.beginPath();
-    ctx.arc(0, 0, unit * 0.45, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, unit * 0.9, 0, Math.PI * 1.4);
+    const corePoints = 7;
+    for (let i = 0; i < corePoints; i++) {
+      const a = (i * Math.PI * 2) / corePoints;
+      const r = unit * (0.07 + (i % 2) * 0.03);
+      const px = Math.cos(a) * r;
+      const py = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.lineWidth = 1;
     ctx.stroke();
   } else if (sab.type === 'censor') {
     const barW = unit * 3.1;

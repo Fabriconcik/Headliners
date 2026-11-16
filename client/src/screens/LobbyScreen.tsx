@@ -356,6 +356,32 @@ export function LobbyScreen({ snapshot, playerId, send, onLeaveRoom }: Props) {
               />
             </label>
 
+            {/* Clean Replay toggle */}
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 12px',
+                background: 'var(--surface-2)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>Чистый повтор</div>
+                <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                  Скрыть саботаж зрителей в итоговом видео (только рисунки и реакции)
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={snapshot.cleanReplay}
+                onChange={(e) => send({ type: 'TOGGLE_CLEAN_REPLAY', enabled: e.target.checked })}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+            </label>
+
             {/* Add Bot button */}
             <button
               type="button"

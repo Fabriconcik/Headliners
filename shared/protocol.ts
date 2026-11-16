@@ -111,6 +111,7 @@ export interface ReplayPayload {
   totalPlaybackDurationMs: number;
   speedRanges: ReplaySpeedRange[];
   events: ReplayEvent[];
+  cleanReplay?: boolean;
 }
 
 export interface RoomStateSnapshot {
@@ -118,6 +119,7 @@ export interface RoomStateSnapshot {
   serverNow: number;
   screen: GameScreen;
   testMode: boolean;
+  cleanReplay: boolean;
   hostId: string;
   players: PlayerInfo[];
   slotLimits: RoleSlotLimits;
@@ -137,6 +139,7 @@ export type C2SMessage =
   | { type: 'JOIN_ROOM'; roomCode: string; playerName: string; token?: string }
   | { type: 'RECONNECT'; roomCode: string; token: string }
   | { type: 'TOGGLE_TEST_MODE'; enabled: boolean }
+  | { type: 'TOGGLE_CLEAN_REPLAY'; enabled: boolean }
   | { type: 'ADD_BOT'; preferredRole?: Role }
   | { type: 'REMOVE_BOT'; botId: string }
   | { type: 'START_GAME' }

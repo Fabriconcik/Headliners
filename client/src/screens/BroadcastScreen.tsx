@@ -12,6 +12,8 @@ import {
   Edit2,
   Volume2,
   VolumeX,
+  Maximize,
+  Minimize,
 } from 'lucide-react';
 import type {
   RoomStateSnapshot,
@@ -84,6 +86,18 @@ export function BroadcastScreen({
   }, []);
 
   const now = nowTick + clockOffsetMs;
+  const isFlipped = (snapshot.effects?.flippedUntil ?? 0) > now;
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+      setIsFullscreen(false);
+    }
+  };
 
   // Phase countdown timer
   const [timeLeft, setTimeLeft] = useState(0);
@@ -141,6 +155,19 @@ export function BroadcastScreen({
   const currentStrokeIdRef = useRef<string | null>(null);
   const strokeBufferRef = useRef<PointNorm[]>([]);
   const lastSendPointsTimeRef = useRef<number>(0);
+
+  // Artist Zoom & Pan state
+  const [zoom, setZoom] = useState<number>(1.0);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanMode, setIsPanMode] = useState<boolean>(false);
+
+  const activePointersRef = useRef<Map<number, { clientX: number; clientY: number }>>(new Map());
+  const pinchDistStartRef = useRef<number>(0);
+  const pinchZoomStartRef = useRef<number>(1);
+  const pinchPanStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const pinchMidStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isPinchingRef = useRef<boolean>(false);
+  const singlePanStartRef = useRef<{ clientX: number; clientY: number; panX: number; panY: number } | null>(null);
 
   // Saboteur state
   const [customEmoji, setCustomEmoji] = useState<string>(() => {
@@ -238,7 +265,52 @@ export function BroadcastScreen({
     normY: number,
   ) => {
     if (segment?.phase !== 'LIVE' || me?.role !== 'artist') return;
-    // Reject secondary touches / palm rest if already drawing
+
+    activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
+    // Multi-touch pinch detection
+    if (activePointersRef.current.size >= 2) {
+      if (currentStrokeIdRef.current) {
+        const id = currentStrokeIdRef.current;
+        currentStrokeIdRef.current = null;
+        if (strokeBufferRef.current.length > 0) {
+          const pointsToSend = [...strokeBufferRef.current];
+          strokeBufferRef.current = [];
+          optimisticStrokePoints(id, pointsToSend);
+          send({ type: 'STROKE_POINTS', id, points: pointsToSend });
+        }
+        send({ type: 'STROKE_END', id });
+      }
+      activePointerIdRef.current = null;
+      isPinchingRef.current = true;
+      singlePanStartRef.current = null;
+
+      const pts = Array.from(activePointersRef.current.values());
+      pinchDistStartRef.current = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+      pinchZoomStartRef.current = zoom;
+      pinchPanStartRef.current = { ...pan };
+      pinchMidStartRef.current = {
+        x: (pts[0].clientX + pts[1].clientX) / 2,
+        y: (pts[0].clientY + pts[1].clientY) / 2,
+      };
+      return;
+    }
+
+    // Pan mode single finger drag
+    if (isPanMode) {
+      singlePanStartRef.current = {
+        clientX: e.clientX,
+        clientY: e.clientY,
+        panX: pan.x,
+        panY: pan.y,
+      };
+      try {
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {}
+      return;
+    }
+
+    // Normal single finger drawing
     if (activePointerIdRef.current !== null) return;
     activePointerIdRef.current = e.pointerId;
 
@@ -287,6 +359,53 @@ export function BroadcastScreen({
     normX: number,
     normY: number,
   ) => {
+    activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
+    // Handle 2-finger pinch & pan
+    if (activePointersRef.current.size >= 2) {
+      const pts = Array.from(activePointersRef.current.values());
+      const currentDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+      const ratio = currentDist / Math.max(10, pinchDistStartRef.current);
+      const nextZoom = Math.max(1.0, Math.min(3.5, Math.round(pinchZoomStartRef.current * ratio * 100) / 100));
+
+      const currentMid = {
+        x: (pts[0].clientX + pts[1].clientX) / 2,
+        y: (pts[0].clientY + pts[1].clientY) / 2,
+      };
+      const rawDeltaX = currentMid.x - pinchMidStartRef.current.x;
+      const rawDeltaY = currentMid.y - pinchMidStartRef.current.y;
+      const deltaX = isFlipped ? -rawDeltaX : rawDeltaX;
+      const deltaY = isFlipped ? -rawDeltaY : rawDeltaY;
+
+      const maxPan = nextZoom > 1.05 ? 600 * (nextZoom - 1) : 0;
+      const nextPan =
+        nextZoom <= 1.05
+          ? { x: 0, y: 0 }
+          : {
+              x: Math.max(-maxPan, Math.min(maxPan, pinchPanStartRef.current.x + deltaX)),
+              y: Math.max(-maxPan, Math.min(maxPan, pinchPanStartRef.current.y + deltaY)),
+            };
+
+      setZoom(nextZoom);
+      setPan(nextPan);
+      return;
+    }
+
+    // Handle single-finger pan mode
+    if (singlePanStartRef.current) {
+      const rawDeltaX = e.clientX - singlePanStartRef.current.clientX;
+      const rawDeltaY = e.clientY - singlePanStartRef.current.clientY;
+      const deltaX = isFlipped ? -rawDeltaX : rawDeltaX;
+      const deltaY = isFlipped ? -rawDeltaY : rawDeltaY;
+      const maxPan = zoom > 1.05 ? 600 * (zoom - 1) : 0;
+      setPan({
+        x: Math.max(-maxPan, Math.min(maxPan, singlePanStartRef.current.panX + deltaX)),
+        y: Math.max(-maxPan, Math.min(maxPan, singlePanStartRef.current.panY + deltaY)),
+      });
+      return;
+    }
+
+    // Drawing stroke move
     if (segment?.phase !== 'LIVE' || !currentStrokeIdRef.current) return;
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
     const id = currentStrokeIdRef.current;
@@ -308,6 +427,20 @@ export function BroadcastScreen({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    activePointersRef.current.delete(e.pointerId);
+
+    if (activePointersRef.current.size < 2) {
+      isPinchingRef.current = false;
+    }
+
+    if (singlePanStartRef.current) {
+      singlePanStartRef.current = null;
+      try {
+        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {}
+      return;
+    }
+
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
     activePointerIdRef.current = null;
     if (!currentStrokeIdRef.current) return;
@@ -327,6 +460,16 @@ export function BroadcastScreen({
       send({ type: 'STROKE_POINTS', id, points: pointsToSend });
     }
     send({ type: 'STROKE_END', id });
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const zoomStep = e.deltaY < 0 ? 0.25 : -0.25;
+    setZoom((z) => {
+      const next = Math.max(1.0, Math.min(3.5, Math.round((z + zoomStep) * 100) / 100));
+      if (next <= 1.05) setPan({ x: 0, y: 0 });
+      return next;
+    });
   };
 
   // --- Render phase overlays ---
@@ -540,6 +683,16 @@ export function BroadcastScreen({
         {flashActive && <div className="camera-flash-overlay" />}
         {/* Top Artist Toolbar */}
         <div className={`artist-toolbar ${isForcedBrush ? 'forced-brush-active' : ''}`}>
+          {/* Status badge & topic for mobile sidebar */}
+          <div className="artist-toolbar-status">
+            <div className="badge badge-red" style={{ fontSize: '11px', padding: '2px 6px', flexShrink: 0 }}>
+              <span className="live-dot" /> {timeLeft}с
+            </div>
+            <div className="artist-toolbar-topic" title={segment.headline}>
+              {segment.headline || 'ПРЯМОЙ ЭФИР'}
+            </div>
+          </div>
+
           {isForcedBrush && (
             <div
               style={{
@@ -558,6 +711,7 @@ export function BroadcastScreen({
           )}
 
           <div
+            className="artist-toolbar-inner"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -567,7 +721,7 @@ export function BroadcastScreen({
             }}
           >
             {/* Color swatches */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+            <div className="artist-color-picker" style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
               {ARTIST_COLORS.map((c) => (
                 <button
                   key={c}
@@ -578,8 +732,8 @@ export function BroadcastScreen({
                     setBrushMode('stroke');
                   }}
                   style={{
-                    width: '24px',
-                    height: '24px',
+                    width: '28px',
+                    height: '28px',
                     borderRadius: '50%',
                     background: c,
                     border: selectedColor === c && brushMode === 'stroke' ? '3px solid #06b6d4' : '1px solid #475569',
@@ -587,13 +741,14 @@ export function BroadcastScreen({
                     cursor: segment.phase === 'LIVE' ? 'pointer' : 'not-allowed',
                     padding: 0,
                   }}
-                  title={c}
+                  title={c === '#FFFFFF' ? 'Ластик / Белый' : c}
                 />
               ))}
             </div>
 
             {/* Brush sizes */}
             <div
+              className="artist-brush-sizes"
               style={{
                 display: 'flex',
                 background: 'var(--surface-2)',
@@ -676,15 +831,7 @@ export function BroadcastScreen({
 
           {/* Stamps Drawer dropdown */}
           {stampsDrawerOpen && (
-            <div
-              style={{
-                display: 'flex',
-                gap: '8px',
-                overflowX: 'auto',
-                padding: '6px 2px',
-                borderTop: '1px solid var(--border)',
-              }}
-            >
+            <div className="artist-stamps-drawer">
               {STAMPS.map((st) => (
                 <button
                   key={st.id}
@@ -707,6 +854,69 @@ export function BroadcastScreen({
 
         {/* Central Pure 16:9 Canvas Stage */}
         <div className="artist-canvas-stage">
+          {/* Zoom and Pan floating controls */}
+          <div className="artist-zoom-controls">
+            <div className="badge badge-red" style={{ fontSize: '11px', padding: '2px 7px', flexShrink: 0 }}>
+              <span className="live-dot" /> {timeLeft}с
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setZoom((z) => {
+                  const next = Math.max(1.0, Math.round((z - 0.5) * 10) / 10);
+                  if (next <= 1.05) setPan({ x: 0, y: 0 });
+                  return next;
+                })
+              }
+              disabled={zoom <= 1.0}
+              className="btn btn-secondary btn-sm"
+              style={{ padding: '2px 8px', fontSize: '13px', fontWeight: 900 }}
+              title="Отдалить"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setZoom(1.0);
+                setPan({ x: 0, y: 0 });
+              }}
+              className="btn btn-secondary btn-sm"
+              style={{ padding: '2px 6px', fontSize: '11px', fontWeight: 700, minWidth: '40px' }}
+              title="Сбросить масштаб 100%"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(3.5, Math.round((z + 0.5) * 10) / 10))}
+              disabled={zoom >= 3.5}
+              className="btn btn-secondary btn-sm"
+              style={{ padding: '2px 8px', fontSize: '13px', fontWeight: 900 }}
+              title="Приблизить"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPanMode(!isPanMode)}
+              className={`btn btn-sm ${isPanMode ? 'btn-accent' : 'btn-secondary'}`}
+              style={{ padding: '2px 8px', fontSize: '11px' }}
+              title={isPanMode ? 'Режим панорамы активен' : 'Включить режим перемещения холста'}
+            >
+              {isPanMode ? '✋ Панорама' : '✏️ Рисовать'}
+            </button>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="btn btn-secondary btn-sm"
+              style={{ padding: '2px 6px', fontSize: '11px' }}
+              title={isFullscreen ? 'Обычный экран' : 'Во весь экран'}
+            >
+              {isFullscreen ? <Minimize size={13} /> : <Maximize size={13} />}
+            </button>
+          </div>
+
           <TvDisplay
             drawItems={snapshot.drawItems}
             sabotageItems={snapshot.sabotageItems}
@@ -714,16 +924,20 @@ export function BroadcastScreen({
             clockOffsetMs={clockOffsetMs}
             reactions={reactions}
             showOverlays={false}
+            zoom={zoom}
+            pan={pan}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
+            onWheel={handleWheel}
           />
         </div>
 
         {/* Bottom Compact News & Ticker Zone */}
         <div className="artist-bottom-news">
           <div
+            className="artist-bottom-headline"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -754,7 +968,7 @@ export function BroadcastScreen({
             </div>
           </div>
 
-          <TickerBar messages={snapshot.ticker} />
+          <TickerBar messages={snapshot.ticker} headline={segment.headline} />
         </div>
       </div>
     );

@@ -77,6 +77,7 @@ interface Room {
   code: string;
   hostId: string;
   testMode: boolean;
+  cleanReplay: boolean;
   screen: 'LOBBY' | 'ROLE_SELECT' | 'BROADCAST' | 'REPLAY';
   players: InternalPlayer[];
   roleSelectEndsAt: number;
@@ -260,6 +261,7 @@ export class RoomManager {
       serverNow: now,
       screen: room.screen,
       testMode: room.testMode,
+      cleanReplay: room.cleanReplay ?? false,
       hostId: room.hostId,
       players: room.players.map((p) => ({
         id: p.id,
@@ -508,6 +510,13 @@ export class RoomManager {
         this.syncAll(room);
         break;
 
+      case 'TOGGLE_CLEAN_REPLAY':
+        if (!player.isHost || room.screen !== 'LOBBY') return;
+        if (typeof msg.enabled !== 'boolean') return;
+        room.cleanReplay = msg.enabled;
+        this.syncAll(room);
+        break;
+
       case 'ADD_BOT':
         if (!player.isHost || room.screen !== 'LOBBY') return;
         if (msg.preferredRole !== undefined && !isRole(msg.preferredRole)) {
@@ -635,6 +644,7 @@ export class RoomManager {
       code,
       hostId: playerId,
       testMode: false,
+      cleanReplay: false,
       screen: 'LOBBY',
       players: [host],
       roleSelectEndsAt: 0,
@@ -1104,6 +1114,7 @@ export class RoomManager {
 
     const startedAt = Date.now() + 800; // slight sync buffer for all clients
     const payload = buildReplayPayload(room.recordedSegments, startedAt);
+    payload.cleanReplay = room.cleanReplay ?? false;
     room.replay = payload;
 
     this.syncAll(room);

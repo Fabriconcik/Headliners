@@ -27,6 +27,9 @@ export function ReplayScreen({ snapshot, playerId, clockOffsetMs, send }: Props)
 
   const [tPlayback, setTPlayback] = useState(0);
   const [muted, setMuted] = useState(sfx.muted);
+  const [cleanReplay, setCleanReplay] = useState<boolean>(
+    Boolean(snapshot.cleanReplay ?? replay?.cleanReplay),
+  );
   const playedEventIndicesRef = useRef<Set<number>>(new Set());
 
   // Animation frame loop for smooth 60fps replay playback
@@ -111,18 +114,19 @@ export function ReplayScreen({ snapshot, playerId, clockOffsetMs, send }: Props)
       playedEventIndicesRef.current.add(i);
       if (ev.type === 'PHASE' && ev.phase === 'SPLASH') sfx.playNewsJingle();
       if (ev.type === 'PHASE' && ev.phase === 'FREEZE') sfx.playShutter();
-      if (ev.type === 'WIPERS') sfx.playWipers();
-      if (ev.type === 'SABOTAGE_VISUAL') sfx.playSplat();
-      if (ev.type === 'SABOTAGE_FX') sfx.playGlitch();
+      if (!cleanReplay && ev.type === 'WIPERS') sfx.playWipers();
+      if (!cleanReplay && ev.type === 'SABOTAGE_VISUAL') sfx.playSplat();
+      if (!cleanReplay && ev.type === 'SABOTAGE_FX') sfx.playGlitch();
       if (ev.type === 'REACTION') sfx.playPop();
     }
 
     if (ev.type === 'SEGMENT_START') {
       headline = ev.headline;
       segmentIndex = ev.segmentIndex;
-      // Reset canvas between segments
+      // Reset canvas and ticker between segments
       drawItemsMap.clear();
       sabotageItems = [];
+      tickerMap.clear();
     } else if (ev.type === 'STROKE_ADD') {
       drawItemsMap.set(ev.item.id, { ...ev.item, points: [...ev.item.points] });
     } else if (ev.type === 'STROKE_UPDATE') {
@@ -136,17 +140,21 @@ export function ReplayScreen({ snapshot, playerId, clockOffsetMs, send }: Props)
       drawItemsMap.delete(ev.itemId);
     } else if (ev.type === 'WIPERS') {
       sabotageItems = [];
-      if (virtT - ev.t <= TIMINGS.WIPERS_ANIM_MS) {
+      if (!cleanReplay && virtT - ev.t <= TIMINGS.WIPERS_ANIM_MS) {
         effects.wipersAnimUntil = Date.now() + (TIMINGS.WIPERS_ANIM_MS - (virtT - ev.t));
       }
     } else if (ev.type === 'SABOTAGE_VISUAL') {
-      sabotageItems.push(ev.item);
-    } else if (ev.type === 'SABOTAGE_FX') {
-      if (ev.fx === 'flip' && virtT - ev.t <= TIMINGS.FLIP_DURATION_MS) {
-        effects.flippedUntil = Date.now() + (TIMINGS.FLIP_DURATION_MS - (virtT - ev.t));
+      if (!cleanReplay) {
+        sabotageItems.push(ev.item);
       }
-      if (ev.fx === 'glitch' && virtT - ev.t <= TIMINGS.GLITCH_DURATION_MS) {
-        effects.glitchUntil = Date.now() + (TIMINGS.GLITCH_DURATION_MS - (virtT - ev.t));
+    } else if (ev.type === 'SABOTAGE_FX') {
+      if (!cleanReplay) {
+        if (ev.fx === 'flip' && virtT - ev.t <= TIMINGS.FLIP_DURATION_MS) {
+          effects.flippedUntil = Date.now() + (TIMINGS.FLIP_DURATION_MS - (virtT - ev.t));
+        }
+        if (ev.fx === 'glitch' && virtT - ev.t <= TIMINGS.GLITCH_DURATION_MS) {
+          effects.glitchUntil = Date.now() + (TIMINGS.GLITCH_DURATION_MS - (virtT - ev.t));
+        }
       }
     } else if (ev.type === 'TICKER_ADD') {
       tickerMap.set(ev.id, {
@@ -156,9 +164,11 @@ export function ReplayScreen({ snapshot, playerId, clockOffsetMs, send }: Props)
         createdAt: ev.t,
       });
     } else if (ev.type === 'TICKER_HACK') {
-      const existing = tickerMap.get(ev.id);
-      if (existing) {
-        existing.hackedText = ev.hackedText;
+      if (!cleanReplay) {
+        const existing = tickerMap.get(ev.id);
+        if (existing) {
+          existing.hackedText = ev.hackedText;
+        }
       }
     } else if (ev.type === 'REACTION') {
       if (virtT - ev.t <= 2000) {
@@ -317,19 +327,31 @@ export function ReplayScreen({ snapshot, playerId, clockOffsetMs, send }: Props)
         </div>
 
         {/* Buttons / Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {isFinished ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '16px' }}>🎉</span>
-              <span style={{ fontWeight: 800, fontSize: '13px', color: '#10b981' }}>
-                Выпуск успешно завершен!
-              </span>
-            </div>
-          ) : (
-            <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
-              Смотрим синхронно со всеми игроками...
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${cleanReplay ? 'btn-accent' : 'btn-secondary'}`}
+              onClick={() => setCleanReplay((prev) => !prev)}
+              title="Переключить чистый показ без саботажа зрителей"
+              style={{ fontSize: '11px', padding: '4px 8px' }}
+            >
+              {cleanReplay ? '✨ Чистый повтор' : '🎭 Полный эфир'}
+            </button>
+
+            {isFinished ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '16px' }}>🎉</span>
+                <span style={{ fontWeight: 800, fontSize: '13px', color: '#10b981' }}>
+                  Выпуск завершен!
+                </span>
+              </div>
+            ) : (
+              <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                Смотрим синхронно...
+              </div>
+            )}
+          </div>
 
           {isHost ? (
             <div style={{ display: 'flex', gap: '8px' }}>

@@ -21,7 +21,10 @@ interface Props {
   onPointerMove?: (e: React.PointerEvent<HTMLCanvasElement>, normX: number, normY: number) => void;
   onPointerUp?: (e: React.PointerEvent<HTMLCanvasElement>, normX: number, normY: number) => void;
   onPointerCancel?: (e: React.PointerEvent<HTMLCanvasElement>, normX: number, normY: number) => void;
+  onWheel?: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   phaseBadge?: string;
+  zoom?: number;
+  pan?: { x: number; y: number };
 }
 
 export function TvDisplay({
@@ -39,7 +42,10 @@ export function TvDisplay({
   onPointerMove,
   onPointerUp,
   onPointerCancel,
+  onWheel,
   phaseBadge,
+  zoom = 1,
+  pan = { x: 0, y: 0 },
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
@@ -173,6 +179,11 @@ export function TvDisplay({
             height: '100%',
             touchAction: 'none',
             display: 'block',
+            transform:
+              zoom > 1 || pan.x !== 0 || pan.y !== 0
+                ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
+                : undefined,
+            transformOrigin: 'center center',
           }}
           onPointerDown={(e) => {
             const { x, y } = getNormCoords(e.clientX, e.clientY);
@@ -194,6 +205,7 @@ export function TvDisplay({
             const { x, y } = getNormCoords(e.clientX, e.clientY);
             onPointerCancel?.(e, x, y);
           }}
+          onWheel={onWheel}
         />
 
         {/* Floating Emojis */}
@@ -210,7 +222,7 @@ export function TvDisplay({
               zIndex: 20,
             }}
           >
-            <TickerBar messages={tickerMessages} />
+            <TickerBar messages={tickerMessages ?? []} headline={headline} />
           </div>
         )}
       </div>
